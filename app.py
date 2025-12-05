@@ -7,9 +7,7 @@ from moviepy.editor import (
     concatenate_videoclips,
     vfx
 )
-from PIL import Image
 import cv2
-import numpy as np
 
 st.set_page_config(page_title="Acak Potongan Video", layout="wide")
 st.title("🎞️ Aplikasi Acak Potongan Video + Upscale 1080 + Mute Audio")
@@ -72,11 +70,24 @@ uploaded_video = st.file_uploader("Upload Video", type=["mp4", "mov", "avi"])
 if uploaded_video:
     st.video(uploaded_video)
 
-    temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    temp_input.write(uploaded_video.read())
-    temp_input.close()
+    # temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    # temp_input.write(uploaded_video.read())
+    # temp_input.close()
 
-    clip = VideoFileClip(temp_input.name)
+    # clip = VideoFileClip(temp_input.name)
+    temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+    with open(temp_input, "wb") as f:
+        f.write(uploaded_video.read())
+        f.flush()
+
+    # Pastikan file ada dan bisa dibaca
+    if not os.path.exists(temp_input):
+        st.error("Gagal membuat file sementara!")
+        st.stop()
+
+    # Load video
+    clip = VideoFileClip(temp_input)
+
     duration = clip.duration
     st.info(f"Durasi video: **{duration:.2f} detik**")
 
