@@ -8,14 +8,13 @@ from moviepy.editor import (
     vfx
 )
 import cv2
+import numpy as np
 
 st.set_page_config(page_title="Acak Potongan Video", layout="wide")
 st.title("🎞️ Aplikasi Acak Potongan Video + Upscale 1080 + Mute Audio")
 
-# Folder penyimpanan file sementara di dalam project
+# Folder penyimpanan file sementara
 PROJECT_TEMP_DIR = "videos_temp"
-
-# Buat folder jika belum ada
 os.makedirs(PROJECT_TEMP_DIR, exist_ok=True)
 
 def create_temp_file(extension=".mp4"):
@@ -29,22 +28,20 @@ def cinematic_effect(frame):
     img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
     # Brightness & Contrast
-    alpha = 1.1
-    beta = 10
-    img = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
+    img = cv2.convertScaleAbs(img, alpha=1.1, beta=10)
 
-    # Soft Vignette
     rows, cols = img.shape[:2]
+
+    # Gunakan numpy untuk menghindari peringatan deprecation
     kernel_x = cv2.getGaussianKernel(cols, 400)
     kernel_y = cv2.getGaussianKernel(rows, 400)
-    kernel = kernel_y * kernel_x.T
+    mask = kernel_y @ kernel_x.T
+    mask = 0.5 + (mask / mask.max()) * 0.5
 
-    mask = kernel / kernel.max()
-    mask = 0.5 + (mask * 0.5)
+    mask = mask.astype("float32")
 
     vignette = img.copy()
-    for i in range(3):
-        vignette[:, :, i] = vignette[:, :, i] * mask
+    vignette = (vignette * mask[:, :, None]).astype("uint8")
 
     return cv2.cvtColor(vignette, cv2.COLOR_BGR2RGB)
 
@@ -55,7 +52,14 @@ def cinematic_effect(frame):
 def extract_audio(video_path):
     clip = VideoFileClip(video_path)
     audio_path = create_temp_file(".mp3")
-    clip.audio.write_audiofile(audio_path)
+
+    # MoviePy terbaru perlu param extra
+    clip.audio.write_audiofile(
+        audio_path,
+        fps=44100,
+        bitrate="192k",
+        ffmpeg_params=["-preset", "fast"]
+    )
     clip.close()
     return audio_path
 
@@ -66,14 +70,19 @@ def extract_audio(video_path):
 def mute_video(video_path):
     clip = VideoFileClip(video_path)
     muted_path = create_temp_file(".mp4")
-    muted = clip.without_audio()
-    muted.write_videofile(muted_path, codec="libx264", audio=False)
+
+    clip.without_audio().write_videofile(
+        muted_path,
+        codec="libx264",
+        audio=False,
+        ffmpeg_params=["-preset", "medium"]
+    )
     clip.close()
     return muted_path
 
 
 # ==========================================================
-# MAIN
+# MAIN APP
 # ==========================================================
 uploaded_video = st.file_uploader("Upload Video", type=["mp4", "mov", "avi"])
 
@@ -86,13 +95,12 @@ if uploaded_video:
 
     clip = VideoFileClip(temp_input)
     duration = clip.duration
+
     st.info(f"Durasi video: **{duration:.2f} detik**")
 
-    # Tombol proses
     if st.button("Proses Acak Video"):
         st.warning("Memproses video, mohon tunggu...")
 
-        # =================== PROGRESS BAR ===================
         progress = st.progress(0)
         status = st.empty()
 
@@ -104,47 +112,45 @@ if uploaded_video:
         progress.progress(0.1)
 
         # ==========================================================
-        # 2️⃣ POTONG VIDEO PER 3 DETIK + EFEK ACAK + CINEMATIC
+        # 2️⃣ POTONG VIDEO PER 3 DETIK + EFEK + CINEMATIC
         # ==========================================================
         status.text("Memotong video per 3 detik...")
 
         part_length = 3
         clips = []
         start = 0
-        part_index = 0
+        index = 0
         total_parts = int(duration / part_length) + 1
 
         while start < duration:
             end = min(start + part_length, duration)
 
-            subclip = clip.subclip(start, end)
-            subclip = subclip.fl_image(cinematic_effect)
+            sub = clip.subclip(start, end)
+            sub = sub.fl_image(cinematic_effect)
 
-            # Efek acak
-            effects = ["normal", "slow", "fast", "reverse", "mirror"]
-            chosen = random.choice(effects)
+            effect = random.choice(["normal", "slow", "fast", "reverse", "mirror"])
 
-            if chosen == "slow":
-                subclip = subclip.fx(vfx.speedx, 0.9)
-            elif chosen == "fast":
-                subclip = subclip.fx(vfx.speedx, 1.1)
-            elif chosen == "reverse":
-                subclip = subclip.fx(vfx.time_mirror)
-            elif chosen == "mirror":
-                subclip = subclip.fx(vfx.mirror_x)
+            match effect:
+                case "slow":
+                    sub = sub.fx(vfx.speedx, 0.9)
+                case "fast":
+                    sub = sub.fx(vfx.speedx, 1.1)
+                case "reverse":
+                    sub = sub.fx(vfx.time_mirror)
+                case "mirror":
+                    sub = sub.fx(vfx.mirror_x)
 
-            if part_index != 0:
-                subclip = subclip.fx(vfx.fadein, 0.15)  # 150ms transisi halus
+            if index > 0:
+                sub = sub.fx(vfx.fadein, 0.15)
 
-            clips.append(subclip)
+            clips.append(sub)
 
-            part_index += 1
-            progress.progress(0.1 + (part_index / total_parts) * 0.4)
-            status.text(f"Proses part {part_index}/{total_parts} (Efek: {chosen})")
+            index += 1
+            progress.progress(0.1 + (index / total_parts) * 0.4)
+            status.text(f"Proses part {index}/{total_parts} (Efek: {effect})")
 
             start += part_length
 
-        status.text("Potongan selesai.")
         progress.progress(0.5)
 
         # ==========================================================
@@ -159,40 +165,42 @@ if uploaded_video:
         # ==========================================================
         status.text("Menggabungkan video...")
         final_clip = concatenate_videoclips(clips, method="compose")
-        # final_clip = concatenate_videoclips(final_list, method="compose")
         progress.progress(0.65)
 
         # ==========================================================
-        # 5️⃣ UPSCALE KE 1080P VERTICAL (9:16)
+        # 5️⃣ UPSCALE KE 1080p PORTRAIT
         # ==========================================================
         status.text("Upscale ke 1080p (portrait)...")
 
-        original_w, original_h = final_clip.size
+        w, h = final_clip.size
         target_h = 1920
-        scale = target_h / original_h
-        target_w = int(original_w * scale)
+        scale = target_h / h
+        target_w = int(w * scale)
 
         final_clip = final_clip.resize((target_w, target_h))
         progress.progress(0.75)
 
         # ==========================================================
-        # 6️⃣ HAPUS AUDIO (MUTE)
+        # 6️⃣ EXPORT TANPA AUDIO
         # ==========================================================
-        status.text("Menghapus audio dari video (mute)...")
-        muted_video_path = create_temp_file(".mp4")
-        final_clip.write_videofile(muted_video_path, codec="libx264", audio=False)
-        progress.progress(0.9)
+        status.text("Export video mute...")
 
-        # ==========================================================
-        # DONE
-        # ==========================================================
-        status.text("Selesai!")
+        output_path = create_temp_file(".mp4")
+
+        final_clip.write_videofile(
+            output_path,
+            codec="libx264",
+            audio=False,
+            ffmpeg_params=["-preset", "medium"]
+        )
+
         progress.progress(1.0)
+        status.text("Selesai!")
 
         st.success("Video selesai diproses!")
-        st.video(muted_video_path)
+        st.video(output_path)
 
-        with open(muted_video_path, "rb") as fp:
+        with open(output_path, "rb") as fp:
             st.download_button(
                 label="Download Video Final",
                 data=fp,
