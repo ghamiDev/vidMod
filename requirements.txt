@@ -1,0 +1,9 @@
+streamlit==1.40.2
+numpy==1.26.4
+opencv-python==4.10.0.84
+opencv-contrib-python==4.10.0.84
+moviepy==1.0.3
+Pillow==11.0.0
+imageio==2.36.1
+imageio-ffmpeg==0.5.1
+tqdm==4.66.5
