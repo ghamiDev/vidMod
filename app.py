@@ -9,8 +9,8 @@ from moviepy.editor import (
 )
 import cv2
 
-st.set_page_config(page_title="Acak Potongan Video", layout="wide")
-st.title("🎞️ Aplikasi Acak Potongan Video + Upscale 1080 + Mute Audio")
+st.set_page_config(page_title="Video Mod", layout="wide")
+st.title("=== Video Mod ===")
 
 # ==========================================================
 # CINEMATIC EFFECT (vignette lembut)
@@ -103,7 +103,8 @@ if uploaded_video:
         # 1️⃣ EKSTRAK AUDIO
         # ==========================================================
         status.text("Mengekstrak audio...")
-        audio_original = extract_audio(temp_input.name)
+        # audio_original = extract_audio(temp_input.name)
+        audio_original = extract_audio(temp_input)
         progress.progress(0.1)
 
         # ==========================================================
