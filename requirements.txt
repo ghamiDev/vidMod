@@ -9,3 +9,7 @@ imageio-ffmpeg
 tqdm
 ffmpeg-python
 moviepy==2.0.0.dev2
+libsm6 
+libxext6 
+libgl1 
+libgl1-mesa-glx
