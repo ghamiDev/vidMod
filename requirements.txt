@@ -7,3 +7,4 @@ Pillow
 imageio
 imageio-ffmpeg
 tqdm
+ffmpeg-python
