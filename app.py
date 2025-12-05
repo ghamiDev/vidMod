@@ -1,7 +1,7 @@
+import os
 import streamlit as st
 import tempfile
 import random
-import os
 from moviepy.editor import (
     VideoFileClip,
     concatenate_videoclips,
@@ -9,8 +9,18 @@ from moviepy.editor import (
 )
 import cv2
 
-st.set_page_config(page_title="Video Mod", layout="wide")
-st.title("=== Video Mod ===")
+st.set_page_config(page_title="Acak Potongan Video", layout="wide")
+st.title("🎞️ Aplikasi Acak Potongan Video + Upscale 1080 + Mute Audio")
+
+# Folder penyimpanan file sementara di dalam project
+PROJECT_TEMP_DIR = "videos_temp"
+
+# Buat folder jika belum ada
+os.makedirs(PROJECT_TEMP_DIR, exist_ok=True)
+
+def create_temp_file(extension=".mp4"):
+    rand = str(random.randint(100000, 999999))
+    return os.path.join(PROJECT_TEMP_DIR, f"temp_{rand}{extension}")
 
 # ==========================================================
 # CINEMATIC EFFECT (vignette lembut)
@@ -44,7 +54,7 @@ def cinematic_effect(frame):
 # ==========================================================
 def extract_audio(video_path):
     clip = VideoFileClip(video_path)
-    audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3").name
+    audio_path = create_temp_file(".mp3")
     clip.audio.write_audiofile(audio_path)
     clip.close()
     return audio_path
@@ -55,7 +65,7 @@ def extract_audio(video_path):
 # ==========================================================
 def mute_video(video_path):
     clip = VideoFileClip(video_path)
-    muted_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+    muted_path = create_temp_file(".mp4")
     muted = clip.without_audio()
     muted.write_videofile(muted_path, codec="libx264", audio=False)
     clip.close()
@@ -70,24 +80,11 @@ uploaded_video = st.file_uploader("Upload Video", type=["mp4", "mov", "avi"])
 if uploaded_video:
     st.video(uploaded_video)
 
-    # temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    # temp_input.write(uploaded_video.read())
-    # temp_input.close()
-
-    # clip = VideoFileClip(temp_input.name)
-    temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+    temp_input = create_temp_file(".mp4")
     with open(temp_input, "wb") as f:
         f.write(uploaded_video.read())
-        f.flush()
 
-    # Pastikan file ada dan bisa dibaca
-    if not os.path.exists(temp_input):
-        st.error("Gagal membuat file sementara!")
-        st.stop()
-
-    # Load video
     clip = VideoFileClip(temp_input)
-
     duration = clip.duration
     st.info(f"Durasi video: **{duration:.2f} detik**")
 
@@ -103,7 +100,6 @@ if uploaded_video:
         # 1️⃣ EKSTRAK AUDIO
         # ==========================================================
         status.text("Mengekstrak audio...")
-        # audio_original = extract_audio(temp_input.name)
         audio_original = extract_audio(temp_input)
         progress.progress(0.1)
 
@@ -183,7 +179,7 @@ if uploaded_video:
         # 6️⃣ HAPUS AUDIO (MUTE)
         # ==========================================================
         status.text("Menghapus audio dari video (mute)...")
-        muted_video_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+        muted_video_path = create_temp_file(".mp4")
         final_clip.write_videofile(muted_video_path, codec="libx264", audio=False)
         progress.progress(0.9)
 
