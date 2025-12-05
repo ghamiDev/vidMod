@@ -8,3 +8,4 @@ imageio
 imageio-ffmpeg
 tqdm
 ffmpeg-python
+moviepy==2.0.0.dev2
